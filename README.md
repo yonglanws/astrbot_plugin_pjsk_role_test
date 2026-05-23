@@ -35,12 +35,12 @@
 ## 项目结构
 
 ```
-├── main.py             # 插件主逻辑（题目、角色数据、答题流程、匹配算法）
+├── main.py              # 插件主逻辑（题目、角色数据、答题流程、匹配算法）
 ├── image_gen.py         # 结果图片生成（Pillow 绘制雷达图、进度条、角色立绘）
 ├── metadata.yaml        # 插件元信息
 ├── requirements.txt     # 依赖声明
-├── index.html           # 算法参考实现（web 版测试页）
-└── data/                # 角色立绘本地后备资源
+├── .gitignore           # Git 忽略规则
+└── MiSans-Medium.ttf    # 中文字体文件
 ```
 
 角色立绘从远程 CDN 加载：`https://storage.exmeaning.com/sekai-jp-assets/character/character_select/chr_tl_{id}.webp`
