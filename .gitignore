@@ -1,0 +1,4 @@
+test_gen.py
+result_*.png
+__pycache__/
+*.pyc
