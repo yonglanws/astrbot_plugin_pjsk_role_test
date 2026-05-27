@@ -1,15 +1,15 @@
 import os
 import math
+import re
 import time
 import asyncio
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
-from astrbot.core.utils.session_waiter import session_waiter, SessionController
+from astrbot.core.utils.session_waiter import session_waiter, SessionController, SessionFilter
 import astrbot.api.message_components as Comp
 from .image_gen import generate_result_image
 
-# 大五人格维度
 DIMS = ["EXT", "AGR", "CON", "NEU", "OPN"]
 
 DIM_LABELS = {
@@ -20,7 +20,6 @@ DIM_LABELS = {
     "OPN": "开放性",
 }
 
-# 39道题目，每题 1-5 五档作答，映射到大五维度
 QUESTIONS = [
     {"q": "在集体中，我希望成为大家关注的中心。"},
     {"q": "与朋友在一起时，我大部分时候会主动活跃气氛。"},
@@ -71,9 +70,22 @@ QUESTION_DIMS = [
     "OPN", "OPN", "OPN", "OPN", "OPN", "OPN", "OPN",
 ]
 
-QUESTION_REVERSE = set()
+    # 逆向题索引（0-based）
+    # EXT: 3 (不善社交), 7 (恐惧外向人)
+    # AGR: 11 (不妥协), 14 (讨厌冲突-反向为喜欢冲突？不，14是"讨厌冲突，会想办法避免争吵"，正向是宜人，无逆向)
+    # CON: 23 (放松时不能专注)
+    # NEU: 27 (放松时不能专注-已归为CON), 31 (放松时不能专注-已归为CON)
+    # OPN: 38 (即使不认同也倾听-正向)
+    # 挑选出明确的逆向题：
+    # 3: "我享受和少数密友的深度交流，但并不多于大型聚会。" -> 选5代表喜欢大型聚会，选1代表喜欢独处。这题其实是正向。
+    # 7: "我不会恐惧过于外向的人。" -> 正向。
+    # 31: "在放松的时候，我不能够专注下来干某件事超过1个小时。" -> 尽责性(CON)逆向题。
+    # 38: "即使不认同别人的看法，我也愿意倾听。" -> 宜人性(AGR)或开放性(OPN)正向。
+    # 重新审视题目，我们可以把以下题目设为逆向题：
+    # 3 (第4题): "我享受和少数密友的深度交流，但并不多于大型聚会。" -> 设为逆向（选5代表外向低，即内向）
+    # 31 (第32题): "在放松的时候，我不能够专注下来干某件事超过1个小时。" -> 尽责性逆向（选5代表尽责低）
+QUESTION_REVERSE = {3, 31}
 
-# 20个角色，dim顺序: [EXT, AGR, CON, NEU, OPN]
 CHARACTERS = [
     {
         "name": "星乃一歌", "unit": "Leo/need", "color": "#33AAEE", "img_id": "1",
@@ -158,28 +170,50 @@ CHARACTERS = [
     {
         "name": "宵崎奏", "unit": "25时，Nightcord见。", "color": "#BB6688", "img_id": "17",
         "match": {"EXT": 1, "AGR": 3, "CON": 5, "NEU": 5, "OPN": 5},
-        "desc": "你像奏一样内心充满矛盾痛苦，通过音乐寻找救赎。",
+        "desc": "你像奏一样,内心充满矛盾痛苦，通过音乐寻找救赎。",
     },
     {
         "name": "朝比奈真冬", "unit": "25时，Nightcord见。", "color": "#8888CC", "img_id": "18",
         "match": {"EXT": 1, "AGR": 2, "CON": 5, "NEU": 5, "OPN": 3},
-        "desc": "你像真冬一样完美的表象下隐藏着空虚迷茫的灵魂。",
+        "desc": "你像真冬一样,完美的表象下隐藏着空虚迷茫的灵魂。",
     },
     {
         "name": "东云绘名", "unit": "25时，Nightcord见。", "color": "#CCAA88", "img_id": "19",
         "match": {"EXT": 3, "AGR": 3, "CON": 3, "NEU": 5, "OPN": 4},
-        "desc": "你像绘名一样极度渴望被认可，在寻找自我的路上不断努力。",
+        "desc": "你像绘名一样,极度渴望被认可，在寻找自我的路上不断努力。",
     },
     {
         "name": "晓山瑞希", "unit": "25时，Nightcord见。", "color": "#DDAACC", "img_id": "20",
         "match": {"EXT": 4, "AGR": 5, "CON": 3, "NEU": 3, "OPN": 4},
-        "desc": "你像瑞希一样喜欢所有可爱事物，用纯真和善良感染周围。",
+        "desc": "你像瑞希一样,喜欢所有可爱事物，用纯真和善良感染周围。",
     },
 ]
 
 DIM_COUNTS = {d: 0 for d in DIMS}
 for d in QUESTION_DIMS:
     DIM_COUNTS[d] += 1
+
+BATCH_SIZE = 10
+
+
+class _SenderSessionFilter(SessionFilter):
+    def filter(self, event: AstrMessageEvent) -> str:
+        return f"{event.unified_msg_origin}:{event.get_sender_id()}"
+
+
+def _parse_batch_answers(text: str, expected: int) -> list:
+    nums = re.findall(r"[1-5]", text)
+    return [int(n) for n in nums[:expected]]
+
+
+def _build_batch_nodes(start_idx: int, questions_batch: list, bot_id: str) -> list:
+    nodes = []
+    for i, q in enumerate(questions_batch):
+        q_num = start_idx + i + 1
+        dim_name = DIM_LABELS.get(QUESTION_DIMS[start_idx + i], "")
+        content = f"【第{q_num}题·{dim_name}】\n{q['q']}\n\n1=非常不同意 2=比较不同意 3=中立 4=比较同意 5=非常同意"
+        nodes.append(Comp.Node(uin=bot_id, name="角色匹配测试", content=[Comp.Plain(content)]))
+    return nodes
 
 
 @register("pjsk_role_test", "DumChaer", "世界计划 角色匹配测试 - 通过39道题找到你在 Project Sekai 中的灵魂角色", "2.0.0")
@@ -193,37 +227,127 @@ class PjskGuessPersonaPlugin(Star):
     @filter.command("人格测试")
     async def start_test(self, event: AstrMessageEvent):
         if event.get_group_id():
-            yield event.plain_result("⚠️ 人格测试在群聊中时候会导致刷屏，建议私聊使用！\n发送 1 强制开始答题。")
+            await self._run_group_test(event)
+        else:
+            await self._run_private_test(event)
 
-            @session_waiter(timeout=30, record_history_chains=False)
-            async def group_confirm(controller: SessionController, event: AstrMessageEvent):
-                text = event.message_str.strip()
-                if text == "1":
-                    controller.stop()
-                    await self._run_test(event)
+    async def _run_group_test(self, event: AstrMessageEvent):
+        bot_id = event.get_self_id()
+        sender_id = event.get_sender_id()
+        scores = {d: 0 for d in DIMS}
+        current = 0
+        total = len(QUESTIONS)
+        session_key = f"{event.unified_msg_origin}:{sender_id}"
+        sender_filter = _SenderSessionFilter()
+
+        await event.send(event.plain_result(
+            "世界计划人格测试\n"
+            f"共{total}题，每{BATCH_SIZE}题一批发送。\n"
+            "请用连续数字或逗号分隔作答，例如：1254324542 或 1,2,5,4,3,2,4,5,4,2\n"
+            "发送 0 退出测试。"
+        ))
+
+        while current < total:
+            batch_end = min(current + BATCH_SIZE, total)
+            batch_questions = QUESTIONS[current:batch_end]
+            batch_count = batch_end - current
+
+            nodes = _build_batch_nodes(current, batch_questions, bot_id)
+            batch_label = f"第{current // BATCH_SIZE + 1}批（第{current + 1}-{batch_end}题）"
+            nodes.insert(0, Comp.Node(
+                uin=bot_id, name="人格测试",
+                content=[Comp.Plain(f"{batch_label}\n请回复{batch_count}个数字（1-5），如 1254324542")]
+            ))
+            await event.send(event.chain_result([Comp.Nodes(nodes)]))
+
+            answered = False
+
+            @session_waiter(timeout=180, record_history_chains=False)
+            async def batch_waiter(controller: SessionController, ev: AstrMessageEvent):
+                nonlocal current, scores, answered
+
+                now_ts = time.time()
+                last_ts = self._last_answer_at.get(session_key, 0)
+                if now_ts - last_ts < 0.8:
                     return
+
+                lock = self._session_locks.setdefault(session_key, asyncio.Lock())
+                if lock.locked():
+                    return
+
+                text = ev.message_str.strip()
+
+                if text == "0":
+                    await ev.send(ev.plain_result("已退出测试。"))
+                    controller.stop()
+                    return
+
+                answers = _parse_batch_answers(text, batch_count)
+
+                if len(answers) < batch_count:
+                    await ev.send(ev.plain_result(
+                        f"⚠️ 需要{batch_count}个答案，你输入了{len(answers)}个。请重新输入{batch_count}个数字（1-5）。"
+                    ))
+                    controller.keep(timeout=180, reset_timeout=True)
+                    return
+
+                self._last_answer_at[session_key] = now_ts
+
+                async with lock:
+                    for j, ans in enumerate(answers):
+                        q_idx = current + j
+                        dim = QUESTION_DIMS[q_idx]
+                        val = ans
+                        if q_idx in QUESTION_REVERSE:
+                            val = 6 - val
+                        scores[dim] += val
+
+                current = batch_end
+                answered = True
                 controller.stop()
 
             try:
-                await group_confirm(event)
+                await batch_waiter(event, session_filter=sender_filter)
             except TimeoutError:
-                pass
-            return
+                await event.send(event.plain_result("⏰ 答题超时，请重新开始测试。"))
+                if session_key:
+                    self._last_answer_at.pop(session_key, None)
+                    self._session_locks.pop(session_key, None)
+                event.stop_event()
+                return
+            except Exception as e:
+                logger.error(f"pjsk group test error: {e}")
+                await event.send(event.plain_result("发生错误，请重新开始测试。"))
+                if session_key:
+                    self._last_answer_at.pop(session_key, None)
+                    self._session_locks.pop(session_key, None)
+                event.stop_event()
+                return
 
-        await self._run_test(event)
+            if not answered:
+                break
 
-    async def _run_test(self, event: AstrMessageEvent):
+        if current >= total:
+            await self._send_result(event, scores)
+
+        if session_key:
+            self._last_answer_at.pop(session_key, None)
+            self._session_locks.pop(session_key, None)
+        event.stop_event()
+
+    async def _run_private_test(self, event: AstrMessageEvent):
+        sender_id = event.get_sender_id()
         await event.send(event.plain_result("请发送 1-5 作答，1 代表非常不同意，5 代表非常同意，发送 0 退出测试。\n共39题，请认真作答。"))
 
         scores = {d: 0 for d in DIMS}
         current = 0
-        session_key = None
+        session_key = f"{event.unified_msg_origin}:{sender_id}"
+        sender_filter = _SenderSessionFilter()
 
         @session_waiter(timeout=120, record_history_chains=False)
         async def question_waiter(controller: SessionController, event: AstrMessageEvent):
-            nonlocal current, scores, session_key
+            nonlocal current, scores
 
-            session_key = event.unified_msg_origin
             now_ts = time.time()
             last_ts = self._last_answer_at.get(session_key, 0)
             if now_ts - last_ts < 0.8:
@@ -255,31 +379,7 @@ class PjskGuessPersonaPlugin(Star):
 
             if current >= len(QUESTIONS):
                 async with lock:
-                    try:
-                        ranked = self._calculate_ranked(scores)
-                        top = ranked[0][1]
-
-                        user_avg = {}
-                        for d in DIMS:
-                            count = DIM_COUNTS[d]
-                            if count > 0:
-                                val = scores.get(d, 0) / count
-                                user_avg[d] = round(max(1.0, min(5.0, val)), 2)
-                            else:
-                                user_avg[d] = 3.0
-
-                        img_path = generate_result_image(
-                            user_avg, top, ranked, self.plugin_dir,
-                        )
-                        chain = [
-                            Comp.Plain("测试完成！这是你的结果："),
-                            Comp.Image.fromFileSystem(img_path),
-                        ]
-                        await event.send(event.chain_result(chain))
-                    except Exception as e:
-                        logger.error(f"generate image error: {e}")
-                        result_text = self._text_result(scores)
-                        await event.send(event.plain_result(result_text))
+                    await self._send_result(event, scores)
                 controller.stop()
                 return
 
@@ -295,7 +395,7 @@ class PjskGuessPersonaPlugin(Star):
         await event.send(event.plain_result(f"(1/{len(QUESTIONS)}) {q['q']}\n{opt_text}"))
 
         try:
-            await question_waiter(event)
+            await question_waiter(event, session_filter=sender_filter)
         except TimeoutError:
             await event.send(event.plain_result("⏰ 答题超时，请重新开始测试。"))
         except Exception as e:
@@ -307,25 +407,73 @@ class PjskGuessPersonaPlugin(Star):
                 self._session_locks.pop(session_key, None)
             event.stop_event()
 
+    async def _send_result(self, event: AstrMessageEvent, scores: dict):
+        try:
+            ranked = self._calculate_ranked(scores)
+            top = ranked[0][1]
+
+            user_avg = {}
+            for d in DIMS:
+                count = DIM_COUNTS[d]
+                if count > 0:
+                    val = scores.get(d, 0) / count
+                    user_avg[d] = round(max(1.0, min(5.0, val)), 2)
+                else:
+                    user_avg[d] = 3.0
+
+            img_path = generate_result_image(
+                user_avg, top, ranked, self.plugin_dir,
+            )
+            chain = [
+                Comp.Plain("测试完成！这是你的结果："),
+                Comp.Image.fromFileSystem(img_path),
+            ]
+            await event.send(event.chain_result(chain))
+        except Exception as e:
+            logger.error(f"generate image error: {e}")
+            result_text = self._text_result(scores)
+            await event.send(event.plain_result(result_text))
+
     def _calculate_ranked(self, scores: dict) -> list:
         user_avg = {}
         for d in DIMS:
             count = DIM_COUNTS[d]
             if count > 0:
                 val = scores.get(d, 0) / count
-                user_avg[d] = max(1.0, min(5.0, val))
+                # 中心化拉伸（以 3.0 为中心拉伸 1.5 倍，放大性格倾向）
+                stretched = 3.0 + (val - 3.0) * 1.5
+                user_avg[d] = max(1.0, min(5.0, stretched))
             else:
                 user_avg[d] = 3
-        
+
+        # 建议一：余弦相似度（Cosine Similarity）
+        # 计算公式：cos(A, B) = (A · B) / (||A|| * ||B||)
+        # 为了更好地衡量性格起伏，我们使用“中心化余弦相似度”（即皮尔逊相关系数），将向量减去中立值 3.0
+        user_vec = [user_avg[d] - 3.0 for d in DIMS]
+        user_norm = math.sqrt(sum(x ** 2 for x in user_vec))
+
         ranked = []
-        max_dist = math.sqrt(5 * 16)
-        
         for c in CHARACTERS:
-            dist = math.sqrt(sum((user_avg[d] - c["match"][d]) ** 2 for d in DIMS))
-            percent = max(0, min(100, round(100 * (1 - dist / max_dist))))
+            char_vec = [c["match"][d] - 3.0 for d in DIMS]
+            char_norm = math.sqrt(sum(x ** 2 for x in char_vec))
+
+            # 边界处理：如果用户或角色向量模长为 0（即所有维度都是 3.0 中立）
+            if user_norm == 0 or char_norm == 0:
+                # 此时退化为计算欧氏距离
+                dist = math.sqrt(sum((user_avg[d] - c["match"][d]) ** 2 for d in DIMS))
+                max_dist = math.sqrt(5 * 16)
+                percent = max(0, min(100, round(100 * (1 - dist / max_dist))))
+            else:
+                dot_product = sum(u * cv for u, cv in zip(user_vec, char_vec))
+                cosine = dot_product / (user_norm * char_norm)
+                # 将余弦值 [-1, 1] 映射到契合度百分比 [0, 100]
+                # 映射公式：percent = (cosine + 1) / 2 * 100
+                percent = max(0, min(100, round((cosine + 1) / 2 * 100)))
+
             ranked.append((percent, c))
-        
+
         ranked.sort(key=lambda x: x[0], reverse=True)
+
         return ranked
 
     def _text_result(self, scores: dict) -> str:
