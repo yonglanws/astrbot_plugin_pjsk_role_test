@@ -220,7 +220,8 @@ class PjskGuessPersonaPlugin(Star):
     @filter.command("人格测试")
     async def start_test(self, event: AstrMessageEvent):
         if event.get_group_id():
-            if event.get_platform_name() == "qqofficial":
+            # 官方机器人适配器注册的平台名为 qq_official / qq_official_webhook
+            if "qq_official" in (event.get_platform_name() or ""):
                 await event.send(event.plain_result(
                     "官方QQ机器人在群聊中不支持此功能，请私信使用。"
                 ))
