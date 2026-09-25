@@ -1,6 +1,6 @@
 name: astrbot_plugin_pjsk_role_test
 display_name: PJSK人格测试
 author: 慵懒午睡
-description: 世界计划人格测试测试
-version: 2.1.0
+description: 通过20道大五人格题目匹配你的世界计划灵魂角色
+version: 2.2.0
 repo: https://github.com/yonglanws/astrbot_plugin_pjsk_role_test

@@ -51,8 +51,8 @@ QUESTION_DIMS = [
     "OPN", "OPN", "OPN", "OPN",
 ]
 
-# 逆向题索引（0-based）
-# 3 (第4题): "我享受和少数密友的深度交流，但并不多于大型聚会。" -> 设为逆向（选5代表外向低，即内向）
+# 逆向题索引（0-based）：第4题"比起热闹的聚会或演出，我更喜欢和几个亲密的朋友安静地相处。"
+# 选高分代表偏好安静（内向），反向计分
 QUESTION_REVERSE = {3}
 
 CHARACTERS = [
@@ -200,28 +200,49 @@ def _parse_batch_answers(text: str, expected: int) -> list:
     return [int(n) for n in compact[:expected]]
 
 
+def _format_question(q_num: int, q: dict) -> str:
+    return f"【第{q_num}题】\n{q['q']}\n\n1=非常不同意 2=比较不同意 3=中立 4=比较同意 5=非常同意"
+
+
 def _build_batch_nodes(start_idx: int, questions_batch: list, bot_id: str) -> list:
     nodes = []
     for i, q in enumerate(questions_batch):
-        q_num = start_idx + i + 1
-        content = f"【第{q_num}题】\n{q['q']}\n\n1=非常不同意 2=比较不同意 3=中立 4=比较同意 5=非常同意"
-        nodes.append(Comp.Node(uin=bot_id, name="人格测试", content=[Comp.Plain(content)]))
+        nodes.append(Comp.Node(
+            uin=bot_id, name="人格测试",
+            content=[Comp.Plain(_format_question(start_idx + i + 1, q))],
+        ))
     return nodes
 
 
-@register("pjsk_role_test", "DumChaer", "世界计划 角色匹配测试 - 通过20道题找到你在 Project Sekai 中的灵魂角色", "2.1.0")
+@register("pjsk_role_test", "DumChaer", "世界计划 角色匹配测试 - 通过20道题找到你在 Project Sekai 中的灵魂角色", "2.2.0")
 class PjskGuessPersonaPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
         self.plugin_dir = os.path.dirname(os.path.abspath(__file__))
         self._last_answer_at = {}
         self._session_locks = {}
+        # 会话代次：同一用户中途重新开始测试时递增，用于让被覆盖的旧 waiter 静默超时
+        self._session_gen = {}
+
+    def _bump_session_gen(self, session_key: str) -> int:
+        gen = self._session_gen.get(session_key, 0) + 1
+        self._session_gen[session_key] = gen
+        return gen
+
+    def _cleanup_session(self, session_key: str, gen: int):
+        # 代次不匹配时不清理，避免误删新一轮测试的会话状态
+        if self._session_gen.get(session_key) == gen:
+            self._session_gen.pop(session_key, None)
+            self._last_answer_at.pop(session_key, None)
+            self._session_locks.pop(session_key, None)
 
     @filter.command("人格测试")
     async def start_test(self, event: AstrMessageEvent):
+        platform = event.get_platform_name() or ""
+        is_qq_official = "qq_official" in platform
         if event.get_group_id():
             # 官方机器人适配器注册的平台名为 qq_official / qq_official_webhook
-            if "qq_official" in (event.get_platform_name() or ""):
+            if is_qq_official:
                 await event.send(event.plain_result(
                     "官方QQ机器人在群聊中不支持此功能，请私信使用。"
                 ))
@@ -229,7 +250,8 @@ class PjskGuessPersonaPlugin(Star):
                 return
             await self._run_group_test(event)
         else:
-            await self._run_private_test(event)
+            # 官方机器人被动回复窗口为5分钟，超时须留出提示消息的发送余量
+            await self._run_private_test(event, timeout=280 if is_qq_official else 300)
 
     async def _run_group_test(self, event: AstrMessageEvent):
         bot_id = event.get_self_id()
@@ -239,11 +261,14 @@ class PjskGuessPersonaPlugin(Star):
         total = len(QUESTIONS)
         session_key = f"{event.unified_msg_origin}:{sender_id}"
         sender_filter = _SenderSessionFilter()
+        gen = self._bump_session_gen(session_key)
+        # 合并转发消息仅 aiocqhttp（QQ 个人号）支持，其他平台降级为纯文本发送
+        use_forward = (event.get_platform_name() or "") == "aiocqhttp"
 
         await event.send(event.plain_result(
             "世界计划人格测试\n"
             f"共{total}题，每{BATCH_SIZE}题一批发送。\n"
-            "请用连续数字或逗号分隔作答，例如：1254324542 或 1,2,5,4,3,2,4,5,4,2\n"
+            "请用连续数字或逗号分隔作答，例如：12543 或 1,2,5,4,3\n"
             "发送 0 退出测试，5分钟内未作答将自动结束。"
         ))
 
@@ -251,14 +276,29 @@ class PjskGuessPersonaPlugin(Star):
             batch_end = min(current + BATCH_SIZE, total)
             batch_questions = QUESTIONS[current:batch_end]
             batch_count = batch_end - current
-
-            nodes = _build_batch_nodes(current, batch_questions, bot_id)
             batch_label = f"第{current // BATCH_SIZE + 1}批（第{current + 1}-{batch_end}题）"
-            nodes.insert(0, Comp.Node(
-                uin=bot_id, name="人格测试",
-                content=[Comp.Plain(f"{batch_label}\n请回复{batch_count}个数字（1-5），如 1254324542")]
-            ))
-            await event.send(event.chain_result([Comp.Nodes(nodes)]))
+            batch_hint = f"{batch_label}\n请回复{batch_count}个数字（1-5），如 12543"
+
+            try:
+                if use_forward:
+                    nodes = _build_batch_nodes(current, batch_questions, bot_id)
+                    nodes.insert(0, Comp.Node(
+                        uin=bot_id, name="人格测试",
+                        content=[Comp.Plain(batch_hint)]
+                    ))
+                    await event.send(event.chain_result([Comp.Nodes(nodes)]))
+                else:
+                    body = "\n\n".join(
+                        _format_question(current + i + 1, q)
+                        for i, q in enumerate(batch_questions)
+                    )
+                    await event.send(event.plain_result(f"{batch_hint}\n\n{body}"))
+            except Exception as e:
+                logger.error(f"pjsk group test send error: {e}")
+                await event.send(event.plain_result("题目发送失败，请重新开始测试。"))
+                self._cleanup_session(session_key, gen)
+                event.stop_event()
+                return
 
             answered = False
 
@@ -269,10 +309,6 @@ class PjskGuessPersonaPlugin(Star):
                 now_ts = time.time()
                 last_ts = self._last_answer_at.get(session_key, 0)
                 if now_ts - last_ts < 0.8:
-                    return
-
-                lock = self._session_locks.setdefault(session_key, asyncio.Lock())
-                if lock.locked():
                     return
 
                 text = _clean_answer_text(ev.message_str)
@@ -290,14 +326,12 @@ class PjskGuessPersonaPlugin(Star):
 
                 self._last_answer_at[session_key] = now_ts
 
-                async with lock:
-                    for j, ans in enumerate(answers):
-                        q_idx = current + j
-                        dim = QUESTION_DIMS[q_idx]
-                        val = ans
-                        if q_idx in QUESTION_REVERSE:
-                            val = 6 - val
-                        scores[dim] += val
+                # 计分为纯同步操作，asyncio 单线程下天然原子，无需加锁
+                for j, ans in enumerate(answers):
+                    q_idx = current + j
+                    dim = QUESTION_DIMS[q_idx]
+                    val = 6 - ans if q_idx in QUESTION_REVERSE else ans
+                    scores[dim] += val
 
                 current = batch_end
                 answered = True
@@ -306,18 +340,17 @@ class PjskGuessPersonaPlugin(Star):
             try:
                 await batch_waiter(event, session_filter=sender_filter)
             except TimeoutError:
-                await event.send(event.plain_result("⏰ 超过5分钟未作答，测试已自动结束，请重新开始。"))
-                if session_key:
-                    self._last_answer_at.pop(session_key, None)
-                    self._session_locks.pop(session_key, None)
+                # 代次不匹配说明已有新一轮测试接管该会话，旧 waiter 的超时不应打扰用户
+                if self._session_gen.get(session_key) == gen:
+                    await event.send(event.plain_result("⏰ 超过5分钟未作答，测试已自动结束，请重新开始。"))
+                self._cleanup_session(session_key, gen)
                 event.stop_event()
                 return
             except Exception as e:
                 logger.error(f"pjsk group test error: {e}")
-                await event.send(event.plain_result("发生错误，请重新开始测试。"))
-                if session_key:
-                    self._last_answer_at.pop(session_key, None)
-                    self._session_locks.pop(session_key, None)
+                if self._session_gen.get(session_key) == gen:
+                    await event.send(event.plain_result("发生错误，请重新开始测试。"))
+                self._cleanup_session(session_key, gen)
                 event.stop_event()
                 return
 
@@ -327,12 +360,10 @@ class PjskGuessPersonaPlugin(Star):
         if current >= total:
             await self._send_result(event, scores)
 
-        if session_key:
-            self._last_answer_at.pop(session_key, None)
-            self._session_locks.pop(session_key, None)
+        self._cleanup_session(session_key, gen)
         event.stop_event()
 
-    async def _run_private_test(self, event: AstrMessageEvent):
+    async def _run_private_test(self, event: AstrMessageEvent, timeout: int = 300):
         sender_id = event.get_sender_id()
         await event.send(event.plain_result(f"请发送 1-5 作答，1 代表非常不同意，5 代表非常同意，发送 0 退出测试。\n共{len(QUESTIONS)}题，请认真作答，5分钟内未作答将自动结束。"))
 
@@ -340,8 +371,9 @@ class PjskGuessPersonaPlugin(Star):
         current = 0
         session_key = f"{event.unified_msg_origin}:{sender_id}"
         sender_filter = _SenderSessionFilter()
+        gen = self._bump_session_gen(session_key)
 
-        @session_waiter(timeout=300, record_history_chains=False)
+        @session_waiter(timeout=timeout, record_history_chains=False)
         async def question_waiter(controller: SessionController, event: AstrMessageEvent):
             nonlocal current, scores
 
@@ -350,6 +382,7 @@ class PjskGuessPersonaPlugin(Star):
             if now_ts - last_ts < 0.8:
                 return
 
+            # 锁在 await 发送期间持有，配合上面的 locked() 检查挡住并发的重复消息
             lock = self._session_locks.setdefault(session_key, asyncio.Lock())
             if lock.locked():
                 return
@@ -362,7 +395,7 @@ class PjskGuessPersonaPlugin(Star):
                 return
 
             if text not in ("1", "2", "3", "4", "5"):
-                controller.keep(timeout=300, reset_timeout=True)
+                controller.keep(timeout=timeout, reset_timeout=True)
                 return
 
             answer_value = int(text)
@@ -385,7 +418,7 @@ class PjskGuessPersonaPlugin(Star):
                 opt_text = "1. 非常不同意\n2. 比较不同意\n3. 中立\n4. 比较同意\n5. 非常同意"
                 progress = f"({current + 1}/{len(QUESTIONS)})"
                 await event.send(event.plain_result(f"{progress} {q['q']}\n{opt_text}"))
-            controller.keep(timeout=300, reset_timeout=True)
+            controller.keep(timeout=timeout, reset_timeout=True)
 
         q = QUESTIONS[0]
         opt_text = "1. 非常不同意\n2. 比较不同意\n3. 中立\n4. 比较同意\n5. 非常同意"
@@ -394,14 +427,15 @@ class PjskGuessPersonaPlugin(Star):
         try:
             await question_waiter(event, session_filter=sender_filter)
         except TimeoutError:
-            await event.send(event.plain_result("⏰ 超过5分钟未作答，测试已自动结束，请重新开始。"))
+            # 代次不匹配说明已有新一轮测试接管该会话，旧 waiter 的超时不应打扰用户
+            if self._session_gen.get(session_key) == gen:
+                await event.send(event.plain_result("⏰ 超过5分钟未作答，测试已自动结束，请重新开始。"))
         except Exception as e:
             logger.error(f"pjsk test error: {e}")
-            await event.send(event.plain_result("发生错误，请重新开始测试。"))
+            if self._session_gen.get(session_key) == gen:
+                await event.send(event.plain_result("发生错误，请重新开始测试。"))
         finally:
-            if session_key:
-                self._last_answer_at.pop(session_key, None)
-                self._session_locks.pop(session_key, None)
+            self._cleanup_session(session_key, gen)
             event.stop_event()
 
     async def _send_result(self, event: AstrMessageEvent, scores: dict):
@@ -489,13 +523,8 @@ class PjskGuessPersonaPlugin(Star):
             lines.append(f"{medal} {i+1}. {c['name']}  {score}%")
             lines.append(f"   {c['unit']}")
 
-        sd_parts = []
-        for d in DIMS:
-            val = scores.get(d, 0)
-            if val > 0:
-                sd_parts.append(f"{DIM_LABELS[d]}:{val}")
-        if sd_parts:
-            lines.append("")
-            lines.append("📊 性格维度：" + " ".join(sd_parts))
+        lines.append("")
+        avg_parts = [f"{DIM_LABELS[d]}:{scores.get(d, 0) / DIM_COUNTS[d]:.1f}" for d in DIMS]
+        lines.append("📊 性格维度均分（1-5）：" + " ".join(avg_parts))
 
         return "\n".join(lines)
