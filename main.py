@@ -21,70 +21,39 @@ DIM_LABELS = {
 }
 
 QUESTIONS = [
-    {"q": "在集体中，我希望成为大家关注的中心。"},
-    {"q": "与朋友在一起时，我大部分时候会主动活跃气氛。"},
-    {"q": "在陌生环境中，我会尝试尽快融入而不是观察一段时间。"},
-    {"q": "我享受和少数密友的深度交流，但并不多于大型聚会。"},
-    {"q": "当别人邀请我参加活动时，我通常会欣然接受。"},
-    {"q": "在团队项目中，我倾向于和大家一起热烈讨论。"},
-    {"q": "与初次见面的人交谈，对我来说不是太难的事。"},
-    {"q": "我不会恐惧过于外向的人。"},
-    {"q": "我会认为我属于乖孩子。"},
-    {"q": "看到陌生人难过，我会产生想要安慰的冲动。"},
-    {"q": "如果朋友真诚道歉，我愿意原谅的时候多于不原谅。"},
-    {"q": "有时为了维持和谐，我会选择妥协，即便对我不公。"},
-    {"q": "我相信大多数人是善意的。"},
-    {"q": "当同学遇到困难，我乐于提供力所能及的帮助。"},
-    {"q": "我讨厌冲突，会想办法避免争吵。"},
-    {"q": "即使不同意别人的观点，我也会尝试尊重和理解。"},
-    {"q": "我会为自己制定学习或生活计划，并尽量遵守。"},
-    {"q": "我会坚持对自己热爱的事物，即便遇到他人反对。"},
-    {"q": "我做事比较细心，会反复检查避免出错。"},
-    {"q": "我对自己在意的事情标准比较高。"},
-    {"q": "没有外部监督时，我也能自觉完成任务。"},
-    {"q": "一旦开始一个任务，我通常会坚持到完成。"},
-    {"q": "即便运气很差，我也会不断尝试。"},
-    {"q": "我会认真对待自己的职责，无论是学习还是社团。"},
-    {"q": "面临重要考试或活动前，我会感到过于紧张。"},
-    {"q": "如果某件事没做好，我可能会懊恼很长时间。"},
-    {"q": "我有时会担心未来可能发生的困难。"},
-    {"q": "我的情绪会随着周围事情的好坏而波动。"},
-    {"q": "我喜欢对同伴进行有效的建议，即便可能被视为压力。"},
-    {"q": "做完选择后，经常会想如果选另一个会怎样。"},
-    {"q": "我对别人的评价十分敏感，会在意很久。"},
-    {"q": "在放松的时候，我不能够专注下来干某件事超过1个小时。"},
-    {"q": "我对新鲜事物总是充满好奇。"},
-    {"q": "我喜欢音乐、绘画或文学等艺术形式。"},
-    {"q": "我偶尔会冒出一些新奇的想法或创意。"},
-    {"q": "我愿意尝试没吃过的食物或没玩过的运动。"},
-    {"q": "我喜欢思考一些抽象或哲学性的问题。"},
-    {"q": "我对某类事物有偏爱，但并不狭隘。"},
-    {"q": "即使不认同别人的看法，我也愿意倾听。"},
+    {"q": "在集体活动或舞台上，我希望成为大家关注的焦点。"},
+    {"q": "和朋友相处时，我通常是活跃气氛、让大家开心的人。"},
+    {"q": "在陌生环境或舞台上，我愿意主动表现自己，而不是先观察。"},
+    {"q": "比起热闹的聚会或演出，我更喜欢和几个亲密的朋友安静地相处。"},
+    {"q": "看到别人情绪低落，我会发自内心地想要安慰他们。"},
+    {"q": "即使朋友曾经伤害过我，只要真诚道歉，我愿意原谅并继续相处。"},
+    {"q": "我愿意相信大多数人的善意，即使曾经有过不愉快的经历。"},
+    {"q": "当身边的人陷入困境，我会尽我所能伸出援手。"},
+    {"q": "我会为自己制定明确的目标和计划，并努力去执行。"},
+    {"q": "我做事认真细致，会反复检查直到自己满意为止。"},
+    {"q": "即使没有人在监督，我也能自觉完成自己该做的事情。"},
+    {"q": "一旦下定决心开始做一件事，我会坚持到底，不轻言放弃。"},
+    {"q": "在重要的表演或考试前，我会感到紧张甚至焦虑。"},
+    {"q": "如果事情没有按预期发展，我会很长时间陷入自责和自我怀疑。"},
+    {"q": "我经常担心未来会发生不好的事情，即使现在一切顺利。"},
+    {"q": "我很在意别人对我的看法，负面的评价会让我困扰很长时间。"},
+    {"q": "我对未知的事物充满好奇，喜欢探索新的可能性。"},
+    {"q": "我喜欢音乐、绘画等艺术形式，愿意花时间去创作或欣赏。"},
+    {"q": "我愿意尝试新的体验，比如从未接触过的食物或活动。"},
+    {"q": "我喜欢思考人生的意义、梦想的价值等抽象而深刻的问题。"},
 ]
 
 QUESTION_DIMS = [
-    "EXT", "EXT", "EXT", "EXT", "EXT", "EXT", "EXT", "EXT",
-    "AGR", "AGR", "AGR", "AGR", "AGR", "AGR", "AGR", "AGR",
-    "CON", "CON", "CON", "CON", "CON", "CON", "CON", "CON",
-    "NEU", "NEU", "NEU", "NEU", "NEU", "NEU", "NEU", "NEU",
-    "OPN", "OPN", "OPN", "OPN", "OPN", "OPN", "OPN",
+    "EXT", "EXT", "EXT", "EXT",
+    "AGR", "AGR", "AGR", "AGR",
+    "CON", "CON", "CON", "CON",
+    "NEU", "NEU", "NEU", "NEU",
+    "OPN", "OPN", "OPN", "OPN",
 ]
 
-    # 逆向题索引（0-based）
-    # EXT: 3 (不善社交), 7 (恐惧外向人)
-    # AGR: 11 (不妥协), 14 (讨厌冲突-反向为喜欢冲突？不，14是"讨厌冲突，会想办法避免争吵"，正向是宜人，无逆向)
-    # CON: 23 (放松时不能专注)
-    # NEU: 27 (放松时不能专注-已归为CON), 31 (放松时不能专注-已归为CON)
-    # OPN: 38 (即使不认同也倾听-正向)
-    # 挑选出明确的逆向题：
-    # 3: "我享受和少数密友的深度交流，但并不多于大型聚会。" -> 选5代表喜欢大型聚会，选1代表喜欢独处。这题其实是正向。
-    # 7: "我不会恐惧过于外向的人。" -> 正向。
-    # 31: "在放松的时候，我不能够专注下来干某件事超过1个小时。" -> 尽责性(CON)逆向题。
-    # 38: "即使不认同别人的看法，我也愿意倾听。" -> 宜人性(AGR)或开放性(OPN)正向。
-    # 重新审视题目，我们可以把以下题目设为逆向题：
-    # 3 (第4题): "我享受和少数密友的深度交流，但并不多于大型聚会。" -> 设为逆向（选5代表外向低，即内向）
-    # 31 (第32题): "在放松的时候，我不能够专注下来干某件事超过1个小时。" -> 尽责性逆向（选5代表尽责低）
-QUESTION_REVERSE = {3, 31}
+# 逆向题索引（0-based）
+# 3 (第4题): "我享受和少数密友的深度交流，但并不多于大型聚会。" -> 设为逆向（选5代表外向低，即内向）
+QUESTION_REVERSE = {3}
 
 CHARACTERS = [
     {
@@ -193,7 +162,7 @@ DIM_COUNTS = {d: 0 for d in DIMS}
 for d in QUESTION_DIMS:
     DIM_COUNTS[d] += 1
 
-BATCH_SIZE = 10
+BATCH_SIZE = 5
 
 
 class _SenderSessionFilter(SessionFilter):
@@ -201,22 +170,46 @@ class _SenderSessionFilter(SessionFilter):
         return f"{event.unified_msg_origin}:{event.get_sender_id()}"
 
 
+# 表情（含按键表情 1️⃣）、CQ 码、unicode/HTML 转义中可能混入数字，
+# 提取答案前先整体剔除；全角数字/逗号归一化为半角。
+_NOISE_RE = re.compile(r"(\[CQ:[^\]]*\]|\\u[0-9a-fA-F]{4}|&#x?[0-9a-fA-F]+;)")
+_KEYCAP_RE = re.compile(r"[0-9#*]\uFE0F?\u20E3")
+_EMOJI_RE = re.compile(
+    "["
+    "\U0001F000-\U0001FAFF"
+    "\U00002600-\U000027BF"
+    "\U00002B00-\U00002BFF"
+    "\U0001F1E6-\U0001F1FF"
+    "\uFE0E\uFE0F\u200D\u20E3"
+    "]+"
+)
+_FULLWIDTH_TRANS = str.maketrans("０１２３４５６７８９，", "0123456789,")
+
+
+def _clean_answer_text(text: str) -> str:
+    text = _NOISE_RE.sub("", text)
+    text = _KEYCAP_RE.sub("", text)
+    text = _EMOJI_RE.sub("", text)
+    return text.translate(_FULLWIDTH_TRANS).strip()
+
+
 def _parse_batch_answers(text: str, expected: int) -> list:
-    nums = re.findall(r"[1-5]", text)
-    return [int(n) for n in nums[:expected]]
+    compact = re.sub(r"[,，、．.\s]+", "", _clean_answer_text(text))
+    if not compact or not re.fullmatch(r"[1-5]+", compact):
+        return []
+    return [int(n) for n in compact[:expected]]
 
 
 def _build_batch_nodes(start_idx: int, questions_batch: list, bot_id: str) -> list:
     nodes = []
     for i, q in enumerate(questions_batch):
         q_num = start_idx + i + 1
-        dim_name = DIM_LABELS.get(QUESTION_DIMS[start_idx + i], "")
-        content = f"【第{q_num}题·{dim_name}】\n{q['q']}\n\n1=非常不同意 2=比较不同意 3=中立 4=比较同意 5=非常同意"
-        nodes.append(Comp.Node(uin=bot_id, name="角色匹配测试", content=[Comp.Plain(content)]))
+        content = f"【第{q_num}题】\n{q['q']}\n\n1=非常不同意 2=比较不同意 3=中立 4=比较同意 5=非常同意"
+        nodes.append(Comp.Node(uin=bot_id, name="人格测试", content=[Comp.Plain(content)]))
     return nodes
 
 
-@register("pjsk_role_test", "DumChaer", "世界计划 角色匹配测试 - 通过39道题找到你在 Project Sekai 中的灵魂角色", "2.0.0")
+@register("pjsk_role_test", "DumChaer", "世界计划 角色匹配测试 - 通过20道题找到你在 Project Sekai 中的灵魂角色", "2.1.0")
 class PjskGuessPersonaPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
@@ -227,6 +220,12 @@ class PjskGuessPersonaPlugin(Star):
     @filter.command("人格测试")
     async def start_test(self, event: AstrMessageEvent):
         if event.get_group_id():
+            if event.get_platform_name() == "qqofficial":
+                await event.send(event.plain_result(
+                    "官方QQ机器人在群聊中不支持此功能，请私信使用。"
+                ))
+                event.stop_event()
+                return
             await self._run_group_test(event)
         else:
             await self._run_private_test(event)
@@ -244,7 +243,7 @@ class PjskGuessPersonaPlugin(Star):
             "世界计划人格测试\n"
             f"共{total}题，每{BATCH_SIZE}题一批发送。\n"
             "请用连续数字或逗号分隔作答，例如：1254324542 或 1,2,5,4,3,2,4,5,4,2\n"
-            "发送 0 退出测试。"
+            "发送 0 退出测试，5分钟内未作答将自动结束。"
         ))
 
         while current < total:
@@ -262,7 +261,7 @@ class PjskGuessPersonaPlugin(Star):
 
             answered = False
 
-            @session_waiter(timeout=180, record_history_chains=False)
+            @session_waiter(timeout=300, record_history_chains=False)
             async def batch_waiter(controller: SessionController, ev: AstrMessageEvent):
                 nonlocal current, scores, answered
 
@@ -275,7 +274,7 @@ class PjskGuessPersonaPlugin(Star):
                 if lock.locked():
                     return
 
-                text = ev.message_str.strip()
+                text = _clean_answer_text(ev.message_str)
 
                 if text == "0":
                     await ev.send(ev.plain_result("已退出测试。"))
@@ -285,10 +284,7 @@ class PjskGuessPersonaPlugin(Star):
                 answers = _parse_batch_answers(text, batch_count)
 
                 if len(answers) < batch_count:
-                    await ev.send(ev.plain_result(
-                        f"⚠️ 需要{batch_count}个答案，你输入了{len(answers)}个。请重新输入{batch_count}个数字（1-5）。"
-                    ))
-                    controller.keep(timeout=180, reset_timeout=True)
+                    controller.keep(timeout=300, reset_timeout=True)
                     return
 
                 self._last_answer_at[session_key] = now_ts
@@ -309,7 +305,7 @@ class PjskGuessPersonaPlugin(Star):
             try:
                 await batch_waiter(event, session_filter=sender_filter)
             except TimeoutError:
-                await event.send(event.plain_result("⏰ 答题超时，请重新开始测试。"))
+                await event.send(event.plain_result("⏰ 超过5分钟未作答，测试已自动结束，请重新开始。"))
                 if session_key:
                     self._last_answer_at.pop(session_key, None)
                     self._session_locks.pop(session_key, None)
@@ -337,14 +333,14 @@ class PjskGuessPersonaPlugin(Star):
 
     async def _run_private_test(self, event: AstrMessageEvent):
         sender_id = event.get_sender_id()
-        await event.send(event.plain_result("请发送 1-5 作答，1 代表非常不同意，5 代表非常同意，发送 0 退出测试。\n共39题，请认真作答。"))
+        await event.send(event.plain_result(f"请发送 1-5 作答，1 代表非常不同意，5 代表非常同意，发送 0 退出测试。\n共{len(QUESTIONS)}题，请认真作答，5分钟内未作答将自动结束。"))
 
         scores = {d: 0 for d in DIMS}
         current = 0
         session_key = f"{event.unified_msg_origin}:{sender_id}"
         sender_filter = _SenderSessionFilter()
 
-        @session_waiter(timeout=120, record_history_chains=False)
+        @session_waiter(timeout=300, record_history_chains=False)
         async def question_waiter(controller: SessionController, event: AstrMessageEvent):
             nonlocal current, scores
 
@@ -357,7 +353,7 @@ class PjskGuessPersonaPlugin(Star):
             if lock.locked():
                 return
 
-            text = event.message_str.strip()
+            text = _clean_answer_text(event.message_str)
 
             if text == "0":
                 await event.send(event.plain_result("已退出测试。"))
@@ -365,7 +361,7 @@ class PjskGuessPersonaPlugin(Star):
                 return
 
             if text not in ("1", "2", "3", "4", "5"):
-                controller.keep(timeout=120, reset_timeout=True)
+                controller.keep(timeout=300, reset_timeout=True)
                 return
 
             answer_value = int(text)
@@ -388,7 +384,7 @@ class PjskGuessPersonaPlugin(Star):
                 opt_text = "1. 非常不同意\n2. 比较不同意\n3. 中立\n4. 比较同意\n5. 非常同意"
                 progress = f"({current + 1}/{len(QUESTIONS)})"
                 await event.send(event.plain_result(f"{progress} {q['q']}\n{opt_text}"))
-            controller.keep(timeout=120, reset_timeout=True)
+            controller.keep(timeout=300, reset_timeout=True)
 
         q = QUESTIONS[0]
         opt_text = "1. 非常不同意\n2. 比较不同意\n3. 中立\n4. 比较同意\n5. 非常同意"
@@ -397,7 +393,7 @@ class PjskGuessPersonaPlugin(Star):
         try:
             await question_waiter(event, session_filter=sender_filter)
         except TimeoutError:
-            await event.send(event.plain_result("⏰ 答题超时，请重新开始测试。"))
+            await event.send(event.plain_result("⏰ 超过5分钟未作答，测试已自动结束，请重新开始。"))
         except Exception as e:
             logger.error(f"pjsk test error: {e}")
             await event.send(event.plain_result("发生错误，请重新开始测试。"))
